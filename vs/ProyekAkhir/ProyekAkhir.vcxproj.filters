@@ -48,5 +48,11 @@
     <Image Include="marble.png">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="..\..\..\Grafika Komputer dan Visualisasi\vs\ProyekAkhir\ground3.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="ground2.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

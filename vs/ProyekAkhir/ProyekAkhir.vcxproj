@@ -75,6 +75,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <IncludePath>../../deps/include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <LibraryPath>../../deps/lib;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86</LibraryPath>
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -137,6 +141,8 @@
     <None Include="vertexShader.vert" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="ground2.jpg" />
+    <Image Include="..\..\..\Grafika Komputer dan Visualisasi\vs\ProyekAkhir\ground3.jpg" />
     <Image Include="crate.png" />
     <Image Include="marble.png" />
   </ItemGroup>

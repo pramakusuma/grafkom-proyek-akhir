@@ -13,7 +13,7 @@ public:
 	Demo();
 	~Demo();
 private:
-	GLuint shaderProgram, VBO, VAO, EBO, texture, VBO2, VAO2, EBO2, texture2;
+	GLuint shaderProgram, VBO, VAO, EBO, texture, VBO2, VAO2, EBO2, texture2, textureWall;
 	float angle = 0;
 	virtual void Init();
 	virtual void DeInit();
@@ -24,5 +24,6 @@ private:
 	void BuildColoredPlane();
 	void DrawColoredCube();
 	void DrawColoredPlane();
+	void DrawWeapon();
 };
 

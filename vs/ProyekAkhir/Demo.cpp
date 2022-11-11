@@ -40,19 +40,68 @@ void Demo::ProcessInput(GLFWwindow *window) {
 		glfwSetWindowShouldClose(window, true);
 	}
 
-
-
+	
 }
 
 void Demo::Update(double deltaTime) {
 	angle += (float) ((deltaTime * 1.5f) / 1000);
+
+
+}
+
+
+//Camera Position
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
+//Mouse Position
+double lastX = 0, lastY = 0;
+bool firstMouse = true;
+float yaw;
+float pitch;
+glm::vec3 direction;
+
+
+
+void mouse_callback(GLFWwindow* window, double xpos, double ypos)
+{
+	if (firstMouse)
+	{
+		lastX = xpos;
+		lastY = ypos;
+		firstMouse = false;
+	}
+
+	double xoffset = xpos - lastX;
+	double yoffset = lastY - ypos;
+	lastX = xpos;
+	lastY = ypos;
+
+	float sensitivity = 0.1f;
+	xoffset *= sensitivity;
+	yoffset *= sensitivity;
+
+	yaw += xoffset;
+	pitch += yoffset;
+
+	if (pitch > 89.0f)
+		pitch = 89.0f;
+	if (pitch < -89.0f)
+		pitch = -89.0f;
+
+	
+	direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+	direction.y = sin(glm::radians(pitch));
+	direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+	cameraFront = glm::normalize(direction);
 }
 
 void Demo::Render() {
 	glViewport(0, 0, this->screenWidth, this->screenHeight);
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClearColor(0.950f, 0.490f, 0.114f, 1.0f);
 
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
@@ -64,29 +113,60 @@ void Demo::Render() {
 	glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
 	// LookAt camera (position, target/direction, up)
-	glm::mat4 view = glm::lookAt(glm::vec3(-2, 3, 30), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+	const float cameraSpeed = 0.01f; // adjust accordingly
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		cameraPos += cameraSpeed * cameraFront;
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		cameraPos -= cameraSpeed * cameraFront;
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+	//glm::mat4 view = glm::lookAt(glm::vec3(posX, posY, posZ), glm::vec3(dirX, dirY, dirZ), glm::vec3(upX, upY, upZ));
+	//glm::mat4 view = glm::lookAt(glm::vec3(-2, 3, 10), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+	glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+
 	GLint viewLoc = glGetUniformLocation(this->shaderProgram, "view");
 	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
+	//Mouse Movement
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetCursorPosCallback(window, mouse_callback);
+	
 	DrawColoredCube();
 
 	DrawColoredPlane();
 
+	DrawWeapon();
+
 	glDisable(GL_DEPTH_TEST);
 }
+
+
 
 void Demo::BuildColoredCube() {
 	// load image into texture memory
 	// ------------------------------
 	// Load and create a texture 
+
+	int width, height;
+
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	int width, height;
 	unsigned char* image = SOIL_load_image("metal.png", &width, &height, 0, SOIL_LOAD_RGBA);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
 	SOIL_free_image_data(image);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glGenTextures(1, &textureWall);
+	glBindTexture(GL_TEXTURE_2D, textureWall);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	unsigned char* imageWall = SOIL_load_image("ground4.jpg", &width, &height, 0, SOIL_LOAD_RGBA);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageWall);
+	SOIL_free_image_data(imageWall);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	// set up vertex data (and buffer(s)) and configure vertex attributes
@@ -176,67 +256,89 @@ void Demo::DrawColoredCube()
 	glUseProgram(shaderProgram);
 
 	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, textureWall);
+	glUniform1i(glGetUniformLocation(this->shaderProgram, "ourTexture"), 0);
+
+	glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
+
+
+	// Wall Build
+	glm::mat4 wall1;
+	wall1 = glm::translate(wall1, glm::vec3(10, 1, 0));
+	//model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
+	wall1 = glm::scale(wall1, glm::vec3(1, 3, 10));
+
+	GLint modelLoc = glGetUniformLocation(this->shaderProgram, "model");
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(wall1));
+
+	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+	glm::mat4 wall2;
+	wall2 = glm::translate(wall2, glm::vec3(20, 1, 0));
+	//model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
+	wall2 = glm::scale(wall2, glm::vec3(10, 3, 1));
+
+	glGetUniformLocation(this->shaderProgram, "model");
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(wall2));
+
+	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+	glm::mat4 box1;
+	box1 = glm::translate(box1, glm::vec3(20, 1, 6));
+	//model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
+	box1 = glm::scale(box1, glm::vec3(3, 3, 3));
+
+	glGetUniformLocation(this->shaderProgram, "model");
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(box1));
+
+	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindVertexArray(0);
+}
+
+void Demo::DrawWeapon() {
+
+	glUseProgram(shaderProgram);
+
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glUniform1i(glGetUniformLocation(this->shaderProgram, "ourTexture"), 0);
 
 	glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
 
 
-	// Weapon Build
-	glm::mat4 model;
-	model = glm::translate(model, glm::vec3(0, 3, 0));
-	//model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
-	model = glm::scale(model, glm::vec3(7, 1.5, 1));
+	//Weapon Position
+	glm::vec3 weaponPos = glm::vec3(cameraPos.x + 0.1, cameraPos.y - 0.1, cameraPos.z - 0.5);
 
-	GLint modelLoc = glGetUniformLocation(this->shaderProgram, "model");
-	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
+	glm::mat4 model6;
+	model6 = glm::translate(model6, glm::vec3(direction + cameraPos));
+	model6 = glm::rotate(model6, glm::radians(yaw), glm::vec3(0, -0.5, 0));
+	model6 = glm::rotate(model6, glm::radians(pitch), glm::vec3(0, 0, 0.5));
+	model6 = glm::rotate(model6, glm::radians(10.0f), glm::vec3(0, 0.5, 0));
+	model6 = glm::translate(model6, glm::vec3(-0.5, -0.1, 0.1));
+
+	model6 = glm::scale(model6, glm::vec3(1, 0.1, 0.1));
+
+	GLint modelLoc = glGetUniformLocation(this->shaderProgram, "model");;
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model6));
 	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 
+	glm::mat4 model7;
+	model7 = glm::translate(model7, glm::vec3(direction + cameraPos));
+	model7 = glm::rotate(model7, glm::radians(yaw), glm::vec3(0, -0.5, 0));
+	model7 = glm::rotate(model7, glm::radians(pitch), glm::vec3(0, 0, 0.5));
+	model7 = glm::rotate(model7, glm::radians(10.0f), glm::vec3(0, 0.5, 0));
+	model7 = glm::translate(model7, glm::vec3(-0.6, -0.2, 0.1));
 
-	glm::mat4 model2;
-	model2 = glm::translate(model2, glm::vec3(-2, 1, 0));
-	// model2 = glm::rotate(model2, angle, glm::vec3(1, 0, 0));
-	model2 = glm::scale(model2, glm::vec3(2, 3, 1));
+	model7 = glm::scale(model7, glm::vec3(0.1, 0.2, 0.1));
 
-	glGetUniformLocation(this->shaderProgram, "model");
-	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model2));
-
+	glGetUniformLocation(this->shaderProgram, "model");;
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model7));
 	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-
-
-	glm::mat4 model3;
-	model3 = glm::translate(model3, glm::vec3(-0.5, 1.5, 0));
-	// model2 = glm::rotate(model2, angle, glm::vec3(1, 0, 0));
-	model3 = glm::scale(model3, glm::vec3(1.5, 0.5, 1));
-
-	glGetUniformLocation(this->shaderProgram, "model");
-	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model3));
-
-	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-
-
-	glm::mat4 model4;
-	model4 = glm::translate(model4, glm::vec3(0, 2, 0));
-	// model2 = glm::rotate(model2, angle, glm::vec3(1, 0, 0));
-	model4 = glm::scale(model4, glm::vec3(0.5, 1.5, 1));
-
-	glGetUniformLocation(this->shaderProgram, "model");
-	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model4));
-
-	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-
-
-	glm::mat4 model5;
-	model5 = glm::translate(model5, glm::vec3(3, 3, 0));
-	// model2 = glm::rotate(model2, angle, glm::vec3(1, 0, 0));
-	model5 = glm::scale(model5, glm::vec3(2, 0.5, 0.5));
-
-	glGetUniformLocation(this->shaderProgram, "model");
-	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model5));
-
-	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindVertexArray(0);
@@ -253,10 +355,10 @@ void Demo::BuildColoredPlane()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	int width, height;
-	unsigned char* image = SOIL_load_image("ground.jpg", &width, &height, 0, SOIL_LOAD_RGBA);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
+	unsigned char* imageFloor = SOIL_load_image("ground3.jpg", &width, &height, 0, SOIL_LOAD_RGBA);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageFloor);
 	glGenerateMipmap(GL_TEXTURE_2D);
-	SOIL_free_image_data(image);
+	SOIL_free_image_data(imageFloor);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	// Build geometry
@@ -296,7 +398,6 @@ void Demo::BuildColoredPlane()
 }
 
 
-
 void Demo::DrawColoredPlane()
 {
 	glUseProgram(shaderProgram);
@@ -316,6 +417,7 @@ void Demo::DrawColoredPlane()
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindVertexArray(0);
 }
+
 
 int main(int argc, char** argv) {
 	RenderEngine &app = Demo();
